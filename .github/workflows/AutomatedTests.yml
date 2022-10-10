@@ -7,6 +7,11 @@ on:
         description: 'A project name passed from the caller workflow'
         required: true
         type: string
+      working_directory:
+        description: 'Directory where the automated tests live, passed from the caller workflow. Relative to the root directory. (Default - `AutomatedTests`)'
+        default: 'AutomatedTests'
+        required: false
+        type: string
       node_version:
         description: 'The required version of node passed from the caller workflow'
         required: true
@@ -15,7 +20,10 @@ on:
         description: 'The required npm script passed from the caller workflow'
         required: true
         type: string
-    
+defaults:
+  run:
+    shell: pwsh
+    working-directory: ${{ inputs.working_directory }}
 jobs:
   Automated_Tests:
     name: "🧪 Run Automated Tests"
