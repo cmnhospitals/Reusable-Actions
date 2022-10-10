@@ -21,8 +21,8 @@ defaults:
     shell: pwsh
 
 jobs:
-  Test_Communicator_Sln:
-    name: "🧪 Test Project Solution"
+  Unit_Tests:
+    name: "🧪 Run Unit Tests & Code Coverage"
     if: ${{ always() }}
     runs-on: self-hosted
     steps:
