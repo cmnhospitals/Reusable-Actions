@@ -1,3 +1,5 @@
+name: "🧪 Automated Tests"
+
 on:
   workflow_call:
     inputs:
@@ -16,6 +18,7 @@ on:
     
 jobs:
   Automated_Tests:
+    name: "🧪 Run Automated Tests"
     runs-on: self-hosted
     steps:
     - name: "🚚 Get Latest Code"
