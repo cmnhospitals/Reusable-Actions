@@ -1,0 +1,33 @@
+on:
+  workflow_call:
+    inputs:
+      project_name:
+        description: 'A project name passed from the caller workflow'
+        required: true
+        type: string
+      node_version:
+        description: 'The required version of node passed from the caller workflow'
+        required: true
+        type: string
+      npm_script:
+        description: 'The required npm script passed from the caller workflow'
+        required: true
+        type: string
+    
+jobs:
+  Automated_Tests:
+    runs-on: self-hosted
+    steps:
+    - name: "🚚 Get Latest Code"
+      uses: actions/checkout@v3
+    - name: ⚙️ Use Node.js ${{ inputs.node_version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: "${{ inputs.node_version }}"
+    - name: "🎈 Run Update-AutomationConfig"
+      run: |
+        Install-Module LocalDeploy -Scope CurrentUser -Force
+        Update-AutomationConfig -Environment Test -OctoProject '${{ inputs.project_name }}' -SkipUpdates
+        npm install
+    - name: "🧪 Run Automated Tests for ${{ inputs.project_name }}"
+      run: npm run ${{ inputs.npm_script }}
