@@ -3,8 +3,8 @@ name: "🧪 Automated Tests"
 on:
   workflow_call:
     inputs:
-      project_name:
-        description: 'A project name passed from the caller workflow'
+      octopus_project_name:
+        description: 'The Octopus Deploy project name passed from the caller workflow'
         required: true
         type: string
       working_directory:
@@ -40,7 +40,7 @@ jobs:
     - name: "🎈 Run Update-AutomationConfig"
       run: |
         Install-Module LocalDeploy -Scope CurrentUser -Force
-        Update-AutomationConfig -Environment Test -OctoProject '${{ inputs.project_name }}' -SkipUpdates
+        Update-AutomationConfig -Environment Test -OctoProject '${{ inputs.octopus_project_name }}' -SkipUpdates
         npm install
-    - name: "🧪 Run Automated Tests for ${{ inputs.project_name }}"
+    - name: "🧪 Run Automated Tests for ${{ inputs.octopus_project_name }}"
       run: npm run ${{ inputs.npm_script }}
