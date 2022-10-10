@@ -7,6 +7,14 @@ on:
         description: 'A project name passed from the caller workflow'
         required: true
         type: string
+      node_version:
+        description: 'The required version of node passed from the caller workflow'
+        required: true
+        type: string
+      dotnet_version:
+        description: 'The required version of dotnet passed from the caller workflow'
+        required: true
+        type: string
 
 defaults:
   run:
@@ -20,14 +28,14 @@ jobs:
     steps:
     - name: "🚚 Get Latest Code"
       uses: actions/checkout@v3
-    - name: ⚙️ Use Node.js 16
-      uses: actions/setup-node@v2
+    - name: ⚙️ Use Node.js ${{ inputs.node_version }}
+      uses: actions/setup-node@v3
       with:
-        node-version: "16"
-    - name: ⚙️ Use .NET Core SDK 6.0.x
-      uses: actions/setup-dotnet@v2
+        node-version: "${{ inputs.node_version }}"
+    - name: ⚙️ Use .NET Core SDK ${{ inputs.dotnet_version }}
+      uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 6.0.x
+        dotnet-version: ${{ inputs.dotnet_version }}
     - name: "🚧 Restore Dependencies"
       run: dotnet restore
     - name: "🛠️ Build"
