@@ -33,7 +33,7 @@ jobs:
       with:
         node-version: "${{ inputs.node_version }}"
     - name: ⚙️ Use .NET Core SDK ${{ inputs.dotnet_version }}
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v2
       with:
         dotnet-version: ${{ inputs.dotnet_version }}
     - name: "🚧 Restore Dependencies"
