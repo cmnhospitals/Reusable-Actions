@@ -15,7 +15,7 @@ defaults:
 jobs:
   Test_Communicator_Sln:
     name: "🧪 Test Project Solution"
-    run-name: "🧪 Test {{ inputs.project_name }}.sln"
+    run-name: "🧪 Test ${{ inputs.project_name }}.sln"
     if: ${{ always() }}
     runs-on: self-hosted
     steps:
@@ -43,4 +43,4 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         path-to-lcov: ./CodeCoverage/lcov.info
-        flag-name: {{ inputs.project_name }}.sln
+        flag-name: ${{ inputs.project_name }}.sln
