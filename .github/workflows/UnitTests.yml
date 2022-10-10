@@ -15,7 +15,6 @@ defaults:
 jobs:
   Test_Communicator_Sln:
     name: "🧪 Test Project Solution"
-    run-name: "🧪 Test ${{ inputs.project_name }}.sln"
     if: ${{ always() }}
     runs-on: self-hosted
     steps:
