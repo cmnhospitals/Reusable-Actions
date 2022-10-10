@@ -12,6 +12,11 @@ on:
         default: 'AutomatedTests'
         required: false
         type: string
+      is_pci:
+        description: 'Boolean value for whether or not the caller workflow is from a PCI application repo'
+        default: false
+        required: false
+        type: boolean
       node_version:
         description: 'The required version of node passed from the caller workflow'
         required: true
