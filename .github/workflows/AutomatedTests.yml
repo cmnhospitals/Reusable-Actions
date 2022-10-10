@@ -20,10 +20,12 @@ on:
         description: 'The required npm script passed from the caller workflow'
         required: true
         type: string
+
 defaults:
   run:
     shell: pwsh
     working-directory: ${{ inputs.working_directory }}
+    
 jobs:
   Automated_Tests:
     name: "🧪 Run Automated Tests"
