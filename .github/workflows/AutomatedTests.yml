@@ -42,10 +42,24 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: "${{ inputs.node_version }}"
-    - name: "🎈 Run Update-AutomationConfig"
-      run: |
-        Install-Module LocalDeploy -Scope CurrentUser -Force
-        Update-AutomationConfig -Environment Test -OctoProject '${{ inputs.octopus_project_name }}' -SkipUpdates
-        npm install
+    - name: "🎈 Install LocalDeploy"
+      run: Install-Module LocalDeploy -Scope CurrentUser -Force
+    - name: "🎈 Run Update-AutomationConfig (Non-PCI)"
+      if: inputs.is_pci == false
+      run: Update-AutomationConfig -Environment Test -OctoProject '${{ inputs.octopus_project_name }}' -SkipUpdates
+    - name: "🎈 Run Update-AutomationConfig (PCI)"
+      if: inputs.is_pci == true
+      run: Update-AutomationConfig -Environment PCITest -OctoProject '${{ inputs.octopus_project_name }}' -SkipUpdates
+    - name: "⚙️ Install Node Packages"
+      run: npm install
     - name: "🧪 Run Automated Tests for ${{ inputs.octopus_project_name }}"
       run: npm run ${{ inputs.npm_script }}
+
+
+
+
+
+
+
+
+
