@@ -45,10 +45,10 @@ jobs:
     - name: "🎈 Install LocalDeploy"
       run: Install-Module LocalDeploy -Scope CurrentUser -Force
     - name: "🎈 Run Update-AutomationConfig (Non-PCI)"
-      if: inputs.is_pci == false
+      if: fromJSON(inputs.is_pci) == false
       run: Update-AutomationConfig -Environment Test -OctoProject '${{ inputs.octopus_project_name }}' -SkipUpdates
     - name: "🎈 Run Update-AutomationConfig (PCI)"
-      if: inputs.is_pci == true
+      if: fromJSON(inputs.is_pci) == true
       run: Update-AutomationConfig -Environment PCITest -OctoProject '${{ inputs.octopus_project_name }}' -SkipUpdates
     - name: "⚙️ Install Node Packages"
       run: npm install
