@@ -29,7 +29,6 @@ on:
 defaults:
   run:
     shell: pwsh
-    working-directory: ${{ github.event.inputs.working_directory }}
     
 jobs:
   Automated_Tests:
@@ -47,13 +46,17 @@ jobs:
     - name: "🎈 Run Update-AutomationConfig (Non-PCI)"
       if: fromJSON(inputs.is_pci) == false
       run: Update-AutomationConfig -Environment Test -OctoProject '${{ inputs.octopus_project_name }}' -SkipUpdates
+      working-directory: ${{ inputs.working_directory }}
     - name: "🎈 Run Update-AutomationConfig (PCI)"
       if: fromJSON(inputs.is_pci) == true
       run: Update-AutomationConfig -Environment PCITest -OctoProject '${{ inputs.octopus_project_name }}' -SkipUpdates
+      working-directory: ${{ inputs.working_directory }}
     - name: "⚙️ Install Node Packages"
       run: npm install
+      working-directory: ${{ inputs.working_directory }}
     - name: "🧪 Run Automated Tests for ${{ inputs.octopus_project_name }}"
       run: npm run ${{ inputs.npm_script }}
+      working-directory: ${{ inputs.working_directory }}
 
 
 
