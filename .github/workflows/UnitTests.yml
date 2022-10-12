@@ -39,10 +39,10 @@ jobs:
     - name: "🚧 Restore Dependencies"
       run: dotnet restore
     - name: "🛠️ Build"
-      run: dotnet build --no-restore
+      run: dotnet build --configuration Release --no-restore
     - name: "🧪 Test"
       run: |
-        dotnet test --no-build --no-restore --verbosity normal --filter Category!=Integration --settings CodeCoverage.runsettings -r ./CodeCoverage
+        dotnet test --no-build --no-restore --configuration Release --verbosity normal --filter Category!=Integration --settings CodeCoverage.runsettings -r ./CodeCoverage
         dotnet tool install --global dotnet-reportgenerator-globaltool
         reportgenerator -reports:CodeCoverage/**/coverage.info -targetdir:CodeCoverage -reporttypes:lcov
     - name: "👖 Coveralls"
