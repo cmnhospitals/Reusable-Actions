@@ -41,8 +41,9 @@ jobs:
     - name: "🛠️ Build"
       run: dotnet build --configuration Release --no-restore
     - name: "🧪 Test"
+      run: dotnet test --no-build --no-restore --configuration Release --verbosity normal --filter Category!=Integration --settings CodeCoverage.runsettings -r ./CodeCoverage
+    - name: "📈 Create Coverage Report"
       run: |
-        dotnet test --no-build --no-restore --configuration Release --verbosity normal --filter Category!=Integration --settings CodeCoverage.runsettings -r ./CodeCoverage
         dotnet tool install --global dotnet-reportgenerator-globaltool
         reportgenerator -reports:CodeCoverage/**/coverage.info -targetdir:CodeCoverage -reporttypes:lcov
     - name: "👖 Coveralls"
