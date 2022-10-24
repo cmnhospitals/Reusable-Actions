@@ -1,59 +1,59 @@
 name: "🧪 Automated Tests"
 
 on:
-  workflow_call:
-    inputs:
-      octopus_project_name:
-        description: 'The Octopus Deploy project name passed from the caller workflow'
-        required: true
-        type: string
-      working_directory:
-        description: 'Directory where the automated tests live, passed from the caller workflow. Relative to the root directory. (Default - `AutomatedTests`)'
-        default: 'AutomatedTests'
-        required: false
-        type: string
-      is_pci:
-        description: 'Boolean value for whether or not the caller workflow is from a PCI application repo'
-        default: false
-        required: false
-        type: boolean
-      node_version:
-        description: 'The required version of node passed from the caller workflow'
-        required: true
-        type: string
-      npm_script:
-        description: 'The required npm script passed from the caller workflow'
-        required: true
-        type: string
+    workflow_call:
+        inputs:
+            octopus_project_name:
+                description: 'The Octopus Deploy project name passed from the caller workflow'
+                required: true
+                type: string
+            working_directory:
+                description: 'Directory where the automated tests live, passed from the caller workflow. Relative to the root directory. (Default - `AutomatedTests`)'
+                default: 'AutomatedTests'
+                required: false
+                type: string
+            is_pci:
+                description: 'Boolean value for whether or not the caller workflow is from a PCI application repo'
+                default: false
+                required: false
+                type: boolean
+            node_version:
+                description: 'The required version of node passed from the caller workflow'
+                required: true
+                type: string
+            npm_script:
+                description: 'The required npm script passed from the caller workflow'
+                required: true
+                type: string
 
 defaults:
-  run:
-    shell: pwsh
+    run:
+        shell: pwsh
     
 jobs:
-  Automated_Tests:
-    name: "🧪 Run Automated Tests"
-    runs-on: self-hosted
-    steps:
-    - name: "🚚 Get Latest Code"
-      uses: actions/checkout@v3
-    - name: ⚙️ Use Node.js ${{ inputs.node_version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: "${{ inputs.node_version }}"
-    - name: "🎈 Install LocalDeploy"
-      run: Install-Module LocalDeploy -Scope CurrentUser -Force
-    - name: "🎈 Run Update-AutomationConfig (Non-PCI)"
-      if: fromJSON(inputs.is_pci) == false
-      run: Update-AutomationConfig -Environment Test -OctoProject '${{ inputs.octopus_project_name }}' -SkipUpdates
-      working-directory: ${{ inputs.working_directory }}
-    - name: "🎈 Run Update-AutomationConfig (PCI)"
-      if: fromJSON(inputs.is_pci) == true
-      run: Update-AutomationConfig -Environment PCITest -OctoProject '${{ inputs.octopus_project_name }}' -SkipUpdates
-      working-directory: ${{ inputs.working_directory }}
-    - name: "⚙️ Install Node Packages"
-      run: npm install
-      working-directory: ${{ inputs.working_directory }}
-    - name: "🧪 Run Automated Tests for ${{ inputs.octopus_project_name }}"
-      run: npm run ${{ inputs.npm_script }}
-      working-directory: ${{ inputs.working_directory }}
+    Automated_Tests:
+        name: "🧪 Run Automated Tests"
+        runs-on: self-hosted
+        steps:
+            - name: "🚚 Get Latest Code"
+              uses: actions/checkout@v3
+            - name: ⚙️ Use Node.js ${{ inputs.node_version }}
+              uses: actions/setup-node@v3
+              with:
+                node-version: "${{ inputs.node_version }}"
+            - name: "🎈 Install LocalDeploy"
+              run: Install-Module LocalDeploy -Scope CurrentUser -Force
+            - name: "🎈 Run Update-AutomationConfig (Non-PCI)"
+              if: fromJSON(inputs.is_pci) == false
+              run: Update-AutomationConfig -Environment Test -OctoProject '${{ inputs.octopus_project_name }}' -SkipUpdates
+              working-directory: ${{ inputs.working_directory }}
+            - name: "🎈 Run Update-AutomationConfig (PCI)"
+              if: fromJSON(inputs.is_pci) == true
+              run: Update-AutomationConfig -Environment PCITest -OctoProject '${{ inputs.octopus_project_name }}' -SkipUpdates
+              working-directory: ${{ inputs.working_directory }}
+            - name: "⚙️ Install Node Packages"
+              run: npm install
+              working-directory: ${{ inputs.working_directory }}
+            - name: "🧪 Run Automated Tests for ${{ inputs.octopus_project_name }}"
+              run: npm run ${{ inputs.npm_script }}
+              working-directory: ${{ inputs.working_directory }}
