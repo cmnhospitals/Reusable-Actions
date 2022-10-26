@@ -2,11 +2,12 @@ name: 🚀 Publish
 
 on:
     workflow_call:
-        repository_name:
-            description: The name of the repository. It must previously exist on the server running the workflow and can be found with the command "Get-PSRepository".
-            required: false
-            default: 'CmnhMyGet'
-            type: string
+        inputs:
+            repository_name:
+                description: The name of the repository. It must previously exist on the server running the workflow and can be found with the command "Get-PSRepository".
+                required: false
+                default: 'CmnhMyGet'
+                type: string
 
 jobs:
     Publish:
@@ -16,7 +17,7 @@ jobs:
             - name: "🚚 Get Latest Code"
               uses: actions/checkout@v3
               with:
-              fetch-depth: "0"
+                fetch-depth: "0"
             - name: 🚀 Publish PS Module to MyGet
               run: |
                 try {
