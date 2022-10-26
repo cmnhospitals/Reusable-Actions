@@ -8,6 +8,10 @@ on:
                 required: false
                 default: 'CmnhMyGet'
                 type: string
+                
+defaults:
+    run:
+        shell: pwsh
 
 jobs:
     Publish:
