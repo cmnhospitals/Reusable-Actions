@@ -1,0 +1,323 @@
+name: "🚀 Deploy"
+
+on:
+    workflow_call:
+        inputs:
+            skip_tests:
+                description: Skip Automated Tests after deployment? (Only relevant for Test environment)
+                required: false
+                type: boolean
+            project_title:
+                description: 'The project title passed from the caller workflow'
+                required: true
+                type: string
+            octopus_project_name:
+                description: 'The Octopus Deploy project name passed from the caller workflow'
+                required: true
+                type: string
+            is_pci:
+                description: 'Boolean value for whether or not the caller workflow is from a PCI application repo'
+                default: false
+                required: false
+                type: boolean
+            node_version:
+                description: 'The required version of node passed from the caller workflow'
+                required: true
+                type: string
+            dotnet_version:
+                description: 'The required version of dotnet passed from the caller workflow'
+                required: true
+                type: string
+
+defaults:
+    run:
+        shell: pwsh
+
+env:
+    OCTOPUS_API_KEY: ${{ secrets.OCTOPUS_API_KEY }}
+    OCTOPUS_PROJECT_NAME: ${{ inputs.octopus_project_name }}
+    OCTOPUS_SERVER_URL: ${{ secrets.OCTOPUS_SERVER_URL }}
+    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
+jobs:
+  Version:
+    name: 🏷 Version Step
+    outputs:
+      new_tag: ${{ steps.version.outputs.new_tag }}
+      new_version: ${{ steps.version.outputs.new_version }}
+      previous_tag: ${{ steps.version.outputs.tag }}
+      previous_version: ${{ steps.version.outputs.version }}
+    runs-on: ubuntu-latest
+    steps:
+    - name: "🚚 Get Latest Code"
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: "0"
+    - name: "🤩 GitHub Environment Variables Action"
+      uses: FranzDiebold/github-env-vars-action@v2
+    - name: "Get Version from .csproj file"
+      id: get_version
+      run: |
+        $version = (Get-Content -Path "./src/${{ inputs.octopus_project_name }}/${{ inputs.octopus_project_name }}.csproj" | Select-String -Pattern "<AssemblyVersion>.*</AssemblyVersion>" | Select-Object -First 1).Line.Trim()
+        $version = $version -replace "<AssemblyVersion>" -replace "</AssemblyVersion>"
+        Write-Output "PROJECT_VERSION=$version" | Out-File -FilePath $ENV:GITHUB_ENV -Encoding utf8 -Append
+    - name: "🏷 Bump Version"
+      id: version
+      uses: cmnhospitals/github-tag-action@2.3.3
+      env:
+        #CUSTOM_TAG: ${{ format('{0}{1}{2}{3}{4}', env.PROJECT_VERSION, '-', fromJSON('{"true":"release", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'release')] || fromJSON('{"true":"feat", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'feat')] || fromJSON('{"true":"improv", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'improv')], '+', env.CI_SHA_SHORT) }}
+        CUSTOM_VERSION: ${{ env.PROJECT_VERSION }}
+        APPEND_COMMIT_SHA: ${{ fromJSON('{"true":"false", "false":"true"}')[env.CI_ACTION_REF_NAME == 'main'] }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PREFIX: ${{ inputs.octopus_project_name }}-
+        PRERELEASE_SUFFIX: ${{ fromJSON('{"true":"hotfix", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'hotfix')] || fromJSON('{"true":"hfc", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'hfc')] || fromJSON('{"true":"feat", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'feat')] || fromJSON('{"true":"improv", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'improv')] || fromJSON('{"true":"rc", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'rc')] }}
+        RELEASE_BRANCHES: main
+        TAG_CONTEXT: branch
+        DRY_RUN: true
+  Build:
+    env:
+      DEBUG_DIR: ./src/${{ inputs.octopus_project_name }}/GitHub-Bin/Debug
+      PROJECT_DIR: ./src/${{ inputs.octopus_project_name }}
+      PROJECT_FILE: ${{ inputs.octopus_project_name }}.csproj
+      RELEASE_DIR: ./src/${{ inputs.octopus_project_name }}/GitHub-Bin/Release
+    name: "🛠️ Build & 📦 Pack"
+    needs:
+    - Version
+    runs-on: self-hosted
+    strategy:
+      matrix:
+        configuration:
+        - DEBUG
+        - RELEASE
+    steps:
+    - name: "🚚 Get Latest Code"
+      uses: actions/checkout@v3
+    - name: "🤩 GitHub Environment Variables Action"
+      uses: FranzDiebold/github-env-vars-action@v2
+    - name: ⚙️ Use Node.js ${{ inputs.node_version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: "${{ inputs.node_version }}"
+    - name: ⚙️ Use .NET Core SDK ${{ inputs.dotnet_version }}
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: ${{ inputs.dotnet_version }}
+    - name: "🐙 Install Octopus CLI"
+      uses: OctopusDeploy/install-octopus-cli-action@v1.2.0
+      with:
+        version: latest
+    - name: "🚧 Restore Dependencies"
+      run: dotnet restore "$ENV:PROJECT_DIR/$ENV:PROJECT_FILE"
+    - name: "🛠️ Build ${{ matrix.configuration }}"
+      run: dotnet publish "$ENV:PROJECT_DIR/$ENV:PROJECT_FILE" --configuration ${{ matrix.configuration }} --output $ENV:${{ matrix.configuration }}_DIR --no-restore
+    - name: "🐙📦 Pack"
+      run: |
+        octo pack --format="Zip" --id="$ENV:OCTOPUS_PROJECT_NAME.${{ matrix.configuration }}" --version=${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }} --basePath=$ENV:${{ matrix.configuration }}_DIR --outFolder=octopus/${{ matrix.configuration }} --overwrite
+    - name: "🐙 Push ${{ matrix.configuration }} Build To Octopus"
+      uses: OctopusDeploy/push-package-action@v1.1.2
+      with:
+        api_key: ${{ env.OCTOPUS_API_KEY }}
+        server: ${{ env.OCTOPUS_SERVER_URL }}
+        overwrite_mode: OverwriteExisting
+        packages: octopus/${{ matrix.configuration }}/${{ env.OCTOPUS_PROJECT_NAME }}.${{ matrix.configuration }}.${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}.zip
+
+  Build_Information:
+    name: "📋 Push Build Information File"
+    needs:
+    - Version
+    runs-on: self-hosted
+    steps:
+    - name: "🤩 GitHub Environment Variables Action"
+      uses: FranzDiebold/github-env-vars-action@v2
+    - name: "🐙 Install Octopus CLI"
+      uses: OctopusDeploy/install-octopus-cli-action@v1.2.0
+      with:
+        version: latest
+    - name: "📝 Create Build Info File"
+      run: |
+        if( $ENV:GITHUB_EVENT_NAME -eq "workflow_dispatch" ){
+            $Commits = [PSCustomObject]@{
+                Id = $ENV:GITHUB_SHA;
+                Comment = (git log --format=%B --no-merges -n 1) | Select -First 1;
+            }
+        }
+        else {
+            $Commits = gh pr view $ENV:CI_PR_NUMBER --json commits --jq '.commits[] | {"Id": .oid, "Comment": .messageHeadline}' | ConvertFrom-Json
+        }
+        $BuildInfo = @{
+            BuildEnvironment = "GitHub Action";
+            Branch = $ENV:CI_ACTION_REF_NAME;
+            BuildNumber = $ENV:GITHUB_RUN_NUMBER;
+            BuildUrl = "$ENV:GITHUB_SERVER_URL/$ENV:GITHUB_REPOSITORY/actions/runs/$ENV:GITHUB_RUN_ID";
+            VcsType = "Git";
+            VcsRoot = "$ENV:GITHUB_SERVER_URL/$ENV:GITHUB_REPOSITORY";
+            VcsCommitNumber = $ENV:GITHUB_SHA;
+            Commits = @($Commits)
+        }
+        $BuildInfo
+        New-Item -Name "buildInfo.json" -ItemType File -Value $($BuildInfo | ConvertTo-Json -Depth 10) -Force
+        octo build-information --package-id="$ENV:OCTOPUS_PROJECT_NAME.Debug" --version=${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }} --file="buildInfo.json" --server $ENV:OCTOPUS_SERVER_URL --apiKey $ENV:OCTOPUS_API_KEY --overwrite-mode=OverwriteExisting
+        octo build-information --package-id="$ENV:OCTOPUS_PROJECT_NAME.Release" --version=${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }} --file="buildInfo.json" --server $ENV:OCTOPUS_SERVER_URL --apiKey $ENV:OCTOPUS_API_KEY --overwrite-mode=OverwriteExisting
+
+  Deploy:
+    name: "🎉 Deploy"
+    needs:
+    - Build
+    - Build_Information
+    - Version
+    runs-on: self-hosted
+    steps:
+    - name: "🤩 GitHub Environment Variables Action"
+      uses: FranzDiebold/github-env-vars-action@v2
+    - name: "🐙 Install Octopus CLI"
+      uses: OctopusDeploy/install-octopus-cli-action@v1.2.0
+      with:
+        version: latest
+    - name: "🐙 Create Release"
+      uses: OctopusDeploy/create-release-action@v1.1.3
+      with:
+        api_key: ${{ env.OCTOPUS_API_KEY }}
+        # channel: default
+        ignore_existing: true
+        package_version: ${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}
+        project: ${{ env.OCTOPUS_PROJECT_NAME }}
+        # release_notes: '## GitHub Actions Build: [${{ github.run_number }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})'
+        release_number: ${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}
+        server: ${{ env.OCTOPUS_SERVER_URL }}
+    # - name: "🐙 Start Deployment"
+    #   run: |
+    #     octo deploy-release --project "$ENV:OCTOPUS_PROJECT_NAME" --releaseNumber "${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}" --deployto "${{ fromJSON('{"true":"Azure - PCITest","false":"Azure - Test"}')[inputs.is_pci] }}" --server $ENV:OCTOPUS_SERVER_URL --apiKey $ENV:OCTOPUS_API_KEY --skip "${{ fromJSON('{"true":"Run Automated Tests (GitHub Actions)","false":"none"}')[inputs.skip_tests] }}" --updateVariables --force
+        
+  Slack:
+    name: "🦄 Send Slack Message"
+    needs:
+    - Build
+    - Deploy
+    - Version
+    runs-on: self-hosted
+    steps:
+    - name: "🤩 GitHub Environment Variables Action"
+      uses: FranzDiebold/github-env-vars-action@v2
+    # - name: "🥷 Conditional octopus_button_url for GitHub Action"
+    #   uses: haya14busa/action-cond@v1.1.0
+    #   id: octopus_button_url
+    #   with:
+    #     cond: ${{ needs.Build.result == 'success' }}
+    #     if_true: ${{ env.OCTOPUS_SERVER_URL }}app#/Spaces-1/projects/${{ env.OCTOPUS_PROJECT_NAME }}/deployments/releases/${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}
+    #     if_false: ${{ env.OCTOPUS_SERVER_URL }}app#/Spaces-1/projects/${{ env.OCTOPUS_PROJECT_NAME }}
+    # - name: "🥷 Conditional octopus_release for GitHub Action"
+    #   uses: haya14busa/action-cond@v1.1.0
+    #   id: octopus_release
+    #   with:
+    #     cond: ${{ needs.Build.result == 'success' && needs.Deploy.result == 'success' }}
+    #     if_true: ${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}
+    #     if_false: No Release Created
+    # - name: "🥷 Conditional changelog for GitHub Action"
+    #   uses: haya14busa/action-cond@v1.1.0
+    #   id: changelog
+    #   with:
+    #     cond: ${{ needs.Version.outputs.new_version }}
+    #     if_true: <${{ github.server_url }}/${{ github.repository }}/compare/${{ needs.Version.outputs.previous_tag }}..${{ needs.Version.outputs.new_tag }}|${{ needs.Version.outputs.previous_version }}..${{ needs.Version.outputs.new_version }}>
+    #     if_false: N/A
+    # - name: "🦄 Send Message to #devops Channel"
+    #   id: slack
+    #   uses: slackapi/slack-github-action@v1
+    #   env:
+    #     BUILD_STATUS: ${{ fromJSON('{"success":":large_green_square:Success", "failure":":large_red_square:Failure","cancelled":":large_red_square:Cancelled","skipped":":large_yellow_square:Skipped"}')[needs.Build.result] }}
+    #     DEPLOY_STATUS: ${{ fromJSON('{"success":":large_green_square:Success", "failure":":large_red_square:Failure","cancelled":":large_red_square:Cancelled","skipped":":large_yellow_square:Skipped"}')[needs.Deploy.result] }}
+    #     SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+    #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+    #   with:
+    #     payload: |
+    #       {
+    #           "blocks": [
+    #               {
+    #                   "type": "header",
+    #                   "text": {
+    #                       "type": "plain_text",
+    #                       "text": "${{ inputs.project_title }}"
+    #                   }
+    #               },
+    #               {
+    #                   "type": "divider"
+    #               },
+    #               {
+    #                   "type": "section",
+    #                   "text": {
+    #                       "type": "mrkdwn",
+    #                       "text": "*Branch:* ${{ github.ref_name }}\n*Run Number:* ${{ github.run_number }} (*Attempt Number:* ${{ github.run_attempt }})\n:hammer_and_wrench: *Build:* ${{ env.BUILD_STATUS }}\n:tada: *Deploy Triggered:* ${{ env.DEPLOY_STATUS }}"
+    #                   },
+    #                   "accessory": {
+    #                       "type": "button",
+    #                       "text": {
+    #                           "type": "plain_text",
+    #                           "text": ":octocat: Github",
+    #                           "emoji": true
+    #                       },
+    #                       "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+    #                       "action_id": "button-action"
+    #                   }
+    #               },
+    #               {
+    #                   "type": "section",
+    #                   "text": {
+    #                       "type": "mrkdwn",
+    #                       "text": ":octopus-deploy:*Octopus Release:* ${{ steps.octopus_release.outputs.value }}"
+    #                   },
+    #                   "accessory": {
+    #                       "type": "button",
+    #                       "text": {
+    #                           "type": "plain_text",
+    #                           "text": ":octopus-deploy: Octopus",
+    #                           "emoji": true
+    #                       },
+    #                       "url": "${{ steps.octopus_button_url.outputs.value }}",
+    #                       "action_id": "button-action"
+    #                   }
+    #               },
+    #               {
+    #                   "type": "divider"
+    #               },
+    #               {
+    #                   "type": "context",
+    #                   "elements": [
+    #                       {
+    #                           "type": "mrkdwn",
+    #                           "text": ":git: Commit - <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>"
+    #                       }
+    #                   ]
+    #               },
+    #               {
+    #                   "type": "context",
+    #                   "elements": [
+    #                       {
+    #                           "type": "mrkdwn",
+    #                           "text": ":octocat: Changelog - ${{ steps.changelog.outputs.value }}"
+    #                       }
+    #                   ]
+    #               }
+    #           ]
+    #       }
+  Tag:
+    name: "🏷 Version Tag Step"
+    needs:
+    - Build
+    - Deploy
+    - Version
+    runs-on: ubuntu-latest
+    steps:
+    - name: "🚚 Get Latest Code"
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: "0"
+    - name: "🤩 GitHub Environment Variables Action"
+      uses: FranzDiebold/github-env-vars-action@v2
+    - name: "🏷 Create Git Tag"
+      uses: cmnhospitals/github-tag-action@2.3.3
+      env:
+        CUSTOM_TAG: ${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PREFIX: ${{ inputs.octopus_project_name }}-
+        #PRERELEASE_SUFFIX: ${{ fromJSON('{"true":"hotfix", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'hotfix')] || fromJSON('{"true":"feat", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'feat')] || fromJSON('{"true":"improv", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'improv')] }}
+        RELEASE_BRANCHES: main
+  
