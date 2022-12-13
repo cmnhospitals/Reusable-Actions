@@ -71,7 +71,7 @@ jobs:
       run: |
         $version = (Get-Content -Path "./src/${{ inputs.project_name }}/${{ inputs.project_name }}.csproj" | Select-String -Pattern "<Version>.*</Version>" | Select-Object -First 1).Line.Trim()
         $version = $version -replace "<Version>" -replace "</Version>"
-        Write-Output "PROJECT_VERSION=$version" | Out-File -FilePath $ENV:GITHUB_OUTPUT -Encoding utf8 -Append
+        echo "PROJECT_VERSION=$version" >> $ENV:GITHUB_OUTPUT
     - name: "🏷 Bump Version"
       id: version
       uses: cmnhospitals/github-tag-action@2.3.3
