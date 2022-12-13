@@ -11,12 +11,16 @@ on:
                 description: 'The project title passed from the caller workflow'
                 required: true
                 type: string
+            project_name:
+                description: 'The name of the project passed from the caller workflow. You should include '.Web', '.Admin', etc., but NOT '.csproj''
+                required: true
+                type: string
             octopus_project_name:
                 description: 'The Octopus Deploy project name passed from the caller workflow'
                 required: true
                 type: string
             is_pci:
-                description: 'Boolean value for whether or not the caller workflow is from a PCI application repo'
+                description: 'Boolean value for whether or not the caller workflow is a PCI application repository'
                 default: false
                 required: false
                 type: boolean
@@ -40,6 +44,12 @@ env:
     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   
 jobs:
+  Env:
+    name: 💁 Environment Variables
+    runs-on: self-hosted
+    steps:
+    - name: Print Environment Variables
+      run: "gci env:"
   Version:
     name: 🏷 Version Step
     outputs:
@@ -47,25 +57,25 @@ jobs:
       new_version: ${{ steps.version.outputs.new_version }}
       previous_tag: ${{ steps.version.outputs.tag }}
       previous_version: ${{ steps.version.outputs.version }}
+      project_version: ${{ steps.get_version.outputs.PROJECT_VERSION }}
     runs-on: ubuntu-latest
     steps:
-    - name: "🚚 Get Latest Code"
+    - name: 🚚 Get Latest Code
       uses: actions/checkout@v3
       with:
         fetch-depth: "0"
-    - name: "🤩 GitHub Environment Variables Action"
+    - name: 🤩 GitHub Environment Variables Action
       uses: FranzDiebold/github-env-vars-action@v2
-    - name: "Get Version from .csproj file"
+    - name: "🏷 Get Version from .csproj file"
       id: get_version
       run: |
-        $version = (Get-Content -Path "./src/${{ inputs.octopus_project_name }}/${{ inputs.octopus_project_name }}.csproj" | Select-String -Pattern "<Version>.*</Version>" | Select-Object -First 1).Line.Trim()
-        $version = $version -replace "<Version>" -replace "</Version>"
-        Write-Output "PROJECT_VERSION=$version" | Out-File -FilePath $ENV:GITHUB_ENV -Encoding utf8 -Append
+        $version = (Get-Content -Path "./src/${{ inputs.project_name }}/${{ inputs.project_name }}.csproj" | Select-String -Pattern "<FileVersion>.*</FileVersion>" | Select-Object -First 1).Line.Trim()
+        $version = $version -replace "<FileVersion>" -replace "</FileVersion>"
+        Write-Output "PROJECT_VERSION=$version" | Out-File -FilePath $ENV:GITHUB_OUTPUT -Encoding utf8 -Append
     - name: "🏷 Bump Version"
       id: version
       uses: cmnhospitals/github-tag-action@2.3.3
       env:
-        #CUSTOM_TAG: ${{ format('{0}{1}{2}{3}{4}', env.PROJECT_VERSION, '-', fromJSON('{"true":"release", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'release')] || fromJSON('{"true":"feat", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'feat')] || fromJSON('{"true":"improv", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'improv')], '+', env.CI_SHA_SHORT) }}
         CUSTOM_VERSION: ${{ env.PROJECT_VERSION }}
         APPEND_COMMIT_SHA: ${{ fromJSON('{"true":"false", "false":"true"}')[env.CI_ACTION_REF_NAME == 'main'] }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -76,10 +86,10 @@ jobs:
         DRY_RUN: true
   Build:
     env:
-      DEBUG_DIR: ./src/${{ inputs.octopus_project_name }}/GitHub-Bin/Debug
-      PROJECT_DIR: ./src/${{ inputs.octopus_project_name }}
-      PROJECT_FILE: ${{ inputs.octopus_project_name }}.csproj
-      RELEASE_DIR: ./src/${{ inputs.octopus_project_name }}/GitHub-Bin/Release
+      DEBUG_DIR: ./src/${{ inputs.project_name }}/GitHub-Bin/Debug
+      PROJECT_DIR: ./src/${{ inputs.project_name }}
+      PROJECT_FILE: ${{ inputs.project_name }}.csproj
+      RELEASE_DIR: ./src/${{ inputs.project_name }}/GitHub-Bin/Release
     name: "🛠️ Build & 📦 Pack"
     needs:
     - Version
@@ -106,6 +116,12 @@ jobs:
       uses: OctopusDeploy/install-octopus-cli-action@v1.2.0
       with:
         version: latest
+    - name: "🏷 Set InformationalVersion in .csproj file"
+      id: set_version
+      run: |
+        $csproj = Get-Content -Path "./src/${{ inputs.project_name }}/${{ inputs.project_name }}.csproj"
+        $csproj = $csproj.Replace("<InformationalVersion>${{ needs.Version.outputs.project_version }}</InformationalVersion>","<InformationalVersion>${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}</InformationalVersion>")
+        Set-Content -Path "./src/${{ inputs.project_name }}/${{ inputs.project_name }}.csproj" -Value $csproj
     - name: "🚧 Restore Dependencies"
       run: dotnet restore "$ENV:PROJECT_DIR/$ENV:PROJECT_FILE"
     - name: "🛠️ Build ${{ matrix.configuration }}"
@@ -176,7 +192,6 @@ jobs:
         ignore_existing: true
         package_version: ${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}
         project: ${{ env.OCTOPUS_PROJECT_NAME }}
-        # release_notes: '## GitHub Actions Build: [${{ github.run_number }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})'
         release_number: ${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}
         server: ${{ env.OCTOPUS_SERVER_URL }}
     # - name: "🐙 Start Deployment"
@@ -313,6 +328,5 @@ jobs:
         CUSTOM_TAG: ${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         PREFIX: ${{ inputs.octopus_project_name }}-
-        #PRERELEASE_SUFFIX: ${{ fromJSON('{"true":"hotfix", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'hotfix')] || fromJSON('{"true":"feat", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'feat')] || fromJSON('{"true":"improv", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'improv')] }}
         RELEASE_BRANCHES: main
   
