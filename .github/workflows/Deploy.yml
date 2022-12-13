@@ -69,8 +69,8 @@ jobs:
     - name: "🏷 Get Version from .csproj file"
       id: get_version
       run: |
-        $version = (Get-Content -Path "./src/${{ inputs.project_name }}/${{ inputs.project_name }}.csproj" | Select-String -Pattern "<FileVersion>.*</FileVersion>" | Select-Object -First 1).Line.Trim()
-        $version = $version -replace "<FileVersion>" -replace "</FileVersion>"
+        $version = (Get-Content -Path "./src/${{ inputs.project_name }}/${{ inputs.project_name }}.csproj" | Select-String -Pattern "<Version>.*</Version>" | Select-Object -First 1).Line.Trim()
+        $version = $version -replace "<Version>" -replace "</Version>"
         Write-Output "PROJECT_VERSION=$version" | Out-File -FilePath $ENV:GITHUB_OUTPUT -Encoding utf8 -Append
     - name: "🏷 Bump Version"
       id: version
@@ -119,8 +119,10 @@ jobs:
     - name: "🏷 Set InformationalVersion in .csproj file"
       id: set_version
       run: |
+        $baseVersion = "${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}" -replace "-.*\.", "." -replace "\+.*", ""
         $csproj = Get-Content -Path "./src/${{ inputs.project_name }}/${{ inputs.project_name }}.csproj"
         $csproj = $csproj.Replace("<InformationalVersion>${{ needs.Version.outputs.project_version }}</InformationalVersion>","<InformationalVersion>${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}</InformationalVersion>")
+        $csproj = $csproj.Replace("<Version>${{ needs.Version.outputs.project_version }}</Version>","<Version>$baseVersion</Version>")
         Set-Content -Path "./src/${{ inputs.project_name }}/${{ inputs.project_name }}.csproj" -Value $csproj
     - name: "🚧 Restore Dependencies"
       run: dotnet restore "$ENV:PROJECT_DIR/$ENV:PROJECT_FILE"
