@@ -76,7 +76,7 @@ jobs:
       id: version
       uses: cmnhospitals/github-tag-action@2.3.3
       env:
-        CUSTOM_VERSION: ${{ env.PROJECT_VERSION }}
+        CUSTOM_VERSION: ${{ steps.get_version.outputs.PROJECT_VERSION }}
         APPEND_COMMIT_SHA: ${{ fromJSON('{"true":"false", "false":"true"}')[env.CI_ACTION_REF_NAME == 'main'] }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         PREFIX: ${{ inputs.octopus_project_name }}-
