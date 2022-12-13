@@ -12,7 +12,7 @@ on:
                 required: true
                 type: string
             project_name:
-                description: 'The name of the project passed from the caller workflow. You should include '.Web', '.Admin', etc., but NOT '.csproj''
+                description: "The name of the project passed from the caller workflow. You should include '.Web', '.Admin', etc., but NOT '.csproj'"
                 required: true
                 type: string
             octopus_project_name:
