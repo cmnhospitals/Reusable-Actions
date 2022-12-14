@@ -82,7 +82,7 @@ jobs:
         PREFIX: ${{ inputs.octopus_project_name }}-
         PRERELEASE_SUFFIX: ${{ fromJSON('{"true":"hotfix", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'hotfix/')] || fromJSON('{"true":"hfc", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'hfc/')] || fromJSON('{"true":"feat", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'feature/')] || fromJSON('{"true":"improv", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'improvement/')] || fromJSON('{"true":"rc", "false":""}')[startsWith(env.CI_ACTION_REF_NAME, 'rc/')] }}
         RELEASE_BRANCHES: main
-        TAG_CONTEXT: branch
+        TAG_CONTEXT: repo
         DRY_RUN: true
   Build:
     env:
