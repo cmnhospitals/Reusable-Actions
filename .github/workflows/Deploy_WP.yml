@@ -18,12 +18,12 @@ on:
             src_path:
                 description: Optional path to specify a directory within the repo to deploy from. Ex. "wp-content/themes/soar/". Defaults to root of repo filesystem as source.
                 required: false
-                default: .\
+                default: .
                 type: string
             remote_path:
                 description: Optional path to specify a directory destination to deploy to. Ex. "wp-content/themes/soar/". Defaults to WordPress root directory on WP Engine.
                 required: false
-                default: .\
+                default: .
                 type: string
             rsync_flags:
                 description: Optional rsync flags such as '--delete' or '--exclude-from'. '-a' preserves symbolic links, timestamps, user permissions and ownership. '-z' is for compression. '-v' is for verbose output. '-r' is for recursive directory scanning. Defaults to '-azvr --inplace --delete --exclude-from=exclude.txt'.
