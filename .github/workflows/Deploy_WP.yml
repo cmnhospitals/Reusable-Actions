@@ -35,10 +35,6 @@ defaults:
     run:
         shell: pwsh
 
-env:
-    STAGING_SITE_NAME: ${{ inputs.staging_environment_name }}
-    PRODUCTION_SITE_NAME: ${{ inputs.production_environment_name }}
-
 jobs:
     Deploy:
         runs-on: ubuntu-latest
@@ -59,13 +55,13 @@ jobs:
             id: environment
             with:
                 cond: ${{ github.ref_name == 'production' }}
-                if_true: ${{ env.PRODUCTION_SITE_NAME }}
-                if_false: ${{ env.STAGING_SITE_NAME }}
-          - name: Deploy to WP Engine - ${{ steps.environment.outputs.value || env.STAGING_SITE_NAME }}
+                if_true: ${{ inputs.production_environment_name }}
+                if_false: ${{ inputs.staging_environment_name }}
+          - name: Deploy to WP Engine - ${{ steps.environment.outputs.value || inputs.staging_environment_name }}
             uses: wpengine/github-action-wpe-site-deploy@v3
             with:
                 WPE_SSHG_KEY_PRIVATE: ${{ secrets.WPE_SSHG_KEY_PRIVATE }}
-                WPE_ENV: ${{ steps.environment.outputs.value || env.STAGING_SITE_NAME }}
+                WPE_ENV: ${{ steps.environment.outputs.value || inputs.staging_environment_name }}
                 SRC_PATH: ${{ inputs.src_path }}
                 REMOTE_PATH: ${{ inputs.remote_path }}
                 FLAGS: ${{ inputs.rsync_flags }}
