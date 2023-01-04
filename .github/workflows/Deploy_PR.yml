@@ -1,0 +1,183 @@
+name: "🚀 Deploy Pull Request"
+
+on:
+    workflow_call:
+        inputs:
+            project_title:
+                description: 'The project title passed from the caller workflow'
+                required: true
+                type: string
+            project_name:
+                description: "The name of the project passed from the caller workflow. You should include '.Web', '.Admin', etc., but NOT '.csproj'"
+                required: true
+                type: string
+            octopus_project_name:
+                description: 'The Octopus Deploy project name passed from the caller workflow'
+                required: true
+                type: string
+            is_pci:
+                description: 'Boolean value for whether or not the caller workflow is a PCI application repository'
+                default: false
+                required: false
+                type: boolean
+            node_version:
+                description: 'The required version of node passed from the caller workflow'
+                required: true
+                type: string
+            dotnet_version:
+                description: 'The required version of dotnet passed from the caller workflow'
+                required: true
+                type: string
+
+defaults:
+    run:
+        shell: pwsh
+
+env:
+    OCTOPUS_API_KEY: ${{ secrets.OCTOPUS_API_KEY }}
+    OCTOPUS_PROJECT_NAME: ${{ inputs.octopus_project_name }}
+    OCTOPUS_SERVER_URL: ${{ secrets.OCTOPUS_SERVER_URL }}
+    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
+jobs:
+  Env:
+    name: 💁 Environment Variables
+    runs-on: self-hosted
+    steps:
+    - name: Print Environment Variables
+      run: "gci env:"
+  Version:
+    name: 🏷 Version Step
+    outputs:
+      new_tag: ${{ steps.version.outputs.new_tag }}
+      new_version: ${{ steps.version.outputs.new_version }}
+      previous_tag: ${{ steps.version.outputs.tag }}
+      previous_version: ${{ steps.version.outputs.version }}
+      project_version: ${{ steps.get_version.outputs.PROJECT_VERSION }}
+    runs-on: ubuntu-latest
+    steps:
+    - name: 🚚 Get Latest Code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: "0"
+    - name: 🤩 GitHub Environment Variables Action
+      uses: FranzDiebold/github-env-vars-action@v2
+    - name: "🏷 Get Version from .csproj file"
+      id: get_version
+      run: |
+        $version = (Get-Content -Path "./src/${{ inputs.project_name }}/${{ inputs.project_name }}.csproj" | Select-String -Pattern "<Version>.*</Version>" | Select-Object -First 1).Line.Trim()
+        $version = $version -replace "<Version>" -replace "</Version>"
+        echo "PROJECT_VERSION=$version" >> $ENV:GITHUB_OUTPUT
+    - name: "🏷 Bump Version"
+      id: version
+      uses: cmnhospitals/github-tag-action@2.3.3
+      env:
+        CUSTOM_VERSION: ${{ steps.get_version.outputs.PROJECT_VERSION }}
+        APPEND_COMMIT_SHA: true
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PREFIX: ${{ inputs.octopus_project_name }}-
+        PRERELEASE_SUFFIX: pr
+        RELEASE_BRANCHES: main
+        TAG_CONTEXT: repo
+        DRY_RUN: true
+  Build:
+    env:
+      DEBUG_DIR: ./src/${{ inputs.project_name }}/GitHub-Bin/Debug
+      PROJECT_DIR: ./src/${{ inputs.project_name }}
+      PROJECT_FILE: ${{ inputs.project_name }}.csproj
+      RELEASE_DIR: ./src/${{ inputs.project_name }}/GitHub-Bin/Release
+    name: "🛠️ Build & 📦 Pack"
+    needs:
+    - Version
+    runs-on: self-hosted
+    strategy:
+      matrix:
+        configuration:
+        - DEBUG
+        - RELEASE
+    steps:
+    - name: "🚚 Get Latest Code"
+      uses: actions/checkout@v3
+    - name: "🤩 GitHub Environment Variables Action"
+      uses: FranzDiebold/github-env-vars-action@v2
+    - name: ⚙️ Use Node.js ${{ inputs.node_version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: "${{ inputs.node_version }}"
+    - name: ⚙️ Use .NET Core SDK ${{ inputs.dotnet_version }}
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: ${{ inputs.dotnet_version }}
+    - name: "🐙 Install Octopus CLI"
+      uses: OctopusDeploy/install-octopus-cli-action@v1.2.0
+      with:
+        version: latest
+    - name: "🏷 Set InformationalVersion in .csproj file"
+      id: set_version
+      run: |
+        $baseVersion = "${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}" -replace "-.*\.", "." -replace "\+.*", ""
+        $csproj = Get-Content -Path "./src/${{ inputs.project_name }}/${{ inputs.project_name }}.csproj"
+        $csproj = $csproj.Replace("<InformationalVersion>${{ needs.Version.outputs.project_version }}</InformationalVersion>","<InformationalVersion>${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}</InformationalVersion>")
+        $csproj = $csproj.Replace("<Version>${{ needs.Version.outputs.project_version }}</Version>","<Version>$baseVersion</Version>")
+        Set-Content -Path "./src/${{ inputs.project_name }}/${{ inputs.project_name }}.csproj" -Value $csproj
+    - name: "🚧 Restore Dependencies"
+      run: dotnet restore "$ENV:PROJECT_DIR/$ENV:PROJECT_FILE"
+    - name: "🛠️ Build ${{ matrix.configuration }}"
+      run: dotnet publish "$ENV:PROJECT_DIR/$ENV:PROJECT_FILE" --configuration ${{ matrix.configuration }} --output $ENV:${{ matrix.configuration }}_DIR --no-restore
+    - name: "🐙📦 Pack"
+      run: |
+        octo pack --format="Zip" --id="$ENV:OCTOPUS_PROJECT_NAME.${{ matrix.configuration }}" --version=${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }} --basePath=$ENV:${{ matrix.configuration }}_DIR --outFolder=octopus/${{ matrix.configuration }} --overwrite
+    - name: "🐙 Push ${{ matrix.configuration }} Build To Octopus"
+      uses: OctopusDeploy/push-package-action@v1.1.2
+      with:
+        api_key: ${{ env.OCTOPUS_API_KEY }}
+        server: ${{ env.OCTOPUS_SERVER_URL }}
+        overwrite_mode: OverwriteExisting
+        packages: octopus/${{ matrix.configuration }}/${{ env.OCTOPUS_PROJECT_NAME }}.${{ matrix.configuration }}.${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}.zip
+
+  Deploy:
+    name: "🎉 Deploy"
+    needs:
+    - Build
+    - Build_Information
+    - Version
+    runs-on: self-hosted
+    steps:
+    - name: "🤩 GitHub Environment Variables Action"
+      uses: FranzDiebold/github-env-vars-action@v2
+    - name: "🐙 Install Octopus CLI"
+      uses: OctopusDeploy/install-octopus-cli-action@v1.2.0
+      with:
+        version: latest
+    - name: "🐙 Create Release"
+      uses: OctopusDeploy/create-release-action@v1.1.3
+      with:
+        api_key: ${{ env.OCTOPUS_API_KEY }}
+        space: Web
+        ignore_existing: true
+        package_version: ${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}
+        project: ${{ env.OCTOPUS_PROJECT_NAME }}
+        release_number: ${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}
+        server: ${{ env.OCTOPUS_SERVER_URL }}
+
+  # Tag:
+  #   name: "🏷 Version Tag Step"
+  #   needs:
+  #   - Build
+  #   - Deploy
+  #   - Version
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: "🚚 Get Latest Code"
+  #     uses: actions/checkout@v3
+  #     with:
+  #       fetch-depth: "0"
+  #   - name: "🤩 GitHub Environment Variables Action"
+  #     uses: FranzDiebold/github-env-vars-action@v2
+  #   - name: "🏷 Create Git Tag"
+  #     uses: cmnhospitals/github-tag-action@2.3.3
+  #     env:
+  #       CUSTOM_TAG: ${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}
+  #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       PREFIX: ${{ inputs.octopus_project_name }}-
+  #       RELEASE_BRANCHES: main
