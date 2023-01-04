@@ -139,7 +139,7 @@ jobs:
     name: "🎉 Deploy"
     needs:
     - Build
-    - Build_Information
+    # - Build_Information
     - Version
     runs-on: self-hosted
     steps:
