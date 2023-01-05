@@ -40,7 +40,7 @@ defaults:
 env:
     OCTOPUS_API_KEY: ${{ secrets.OCTOPUS_API_KEY }}
     OCTOPUS_PROJECT_NAME: ${{ inputs.octopus_project_name }}
-    OCTOPUS_SERVER_URL: ${{ secrets.OCTOPUS_SERVER_URL }}
+    OCTOPUS_URL: ${{ secrets.OCTOPUS_SERVER_URL }}
     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   
 jobs:
@@ -113,7 +113,7 @@ jobs:
       with:
         dotnet-version: ${{ inputs.dotnet_version }}
     - name: "🐙 Install Octopus CLI"
-      uses: OctopusDeploy/install-octopus-cli-action@v1.2.0
+      uses: OctopusDeploy/install-octopus-cli-action@v3
       with:
         version: latest
     - name: "🏷 Set InformationalVersion in .csproj file"
@@ -132,10 +132,8 @@ jobs:
       run: |
         octo pack --format="Zip" --id="$ENV:OCTOPUS_PROJECT_NAME.${{ matrix.configuration }}" --version=${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }} --basePath=$ENV:${{ matrix.configuration }}_DIR --outFolder=octopus/${{ matrix.configuration }} --overwrite
     - name: "🐙 Push ${{ matrix.configuration }} Build To Octopus"
-      uses: OctopusDeploy/push-package-action@v1.1.2
+      uses: OctopusDeploy/push-package-action@v3
       with:
-        api_key: ${{ env.OCTOPUS_API_KEY }}
-        server: ${{ env.OCTOPUS_SERVER_URL }}
         overwrite_mode: OverwriteExisting
         packages: octopus/${{ matrix.configuration }}/${{ env.OCTOPUS_PROJECT_NAME }}.${{ matrix.configuration }}.${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}.zip
 
@@ -148,7 +146,7 @@ jobs:
     - name: "🤩 GitHub Environment Variables Action"
       uses: FranzDiebold/github-env-vars-action@v2
     - name: "🐙 Install Octopus CLI"
-      uses: OctopusDeploy/install-octopus-cli-action@v1.2.0
+      uses: OctopusDeploy/install-octopus-cli-action@v3
       with:
         version: latest
     - name: "📝 Create Build Info File"
@@ -182,20 +180,14 @@ jobs:
     steps:
     - name: "🤩 GitHub Environment Variables Action"
       uses: FranzDiebold/github-env-vars-action@v2
-    - name: "🐙 Install Octopus CLI"
-      uses: OctopusDeploy/install-octopus-cli-action@v1.2.0
-      with:
-        version: latest
     - name: "🐙 Create Release"
-      uses: OctopusDeploy/create-release-action@v1.1.3
+      uses: OctopusDeploy/create-release-action@v3
       with:
-        api_key: ${{ env.OCTOPUS_API_KEY }}
         space: Web
         ignore_existing: true
         package_version: ${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}
         project: ${{ env.OCTOPUS_PROJECT_NAME }}
         release_number: ${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}
-        server: ${{ env.OCTOPUS_SERVER_URL }}
     # - name: "🐙 Start Deployment"
     #   run: |
     #     octo deploy-release --project "$ENV:OCTOPUS_PROJECT_NAME" --releaseNumber "${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}" --deployto "${{ fromJSON('{"true":"Azure - PCITest","false":"Azure - Test"}')[inputs.is_pci] }}" --server $ENV:OCTOPUS_SERVER_URL --apiKey $ENV:OCTOPUS_API_KEY --skip "${{ fromJSON('{"true":"Run Automated Tests (GitHub Actions)","false":"none"}')[inputs.skip_tests] }}" --updateVariables --force
