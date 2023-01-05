@@ -130,6 +130,7 @@ jobs:
     - name: "🐙 Push ${{ matrix.configuration }} Build To Octopus"
       uses: OctopusDeploy/push-package-action@v3
       with:
+        space: Web
         overwrite_mode: OverwriteExisting
         packages: octopus/${{ matrix.configuration }}/${{ env.OCTOPUS_PROJECT_NAME }}.${{ matrix.configuration }}.${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}.zip
 
