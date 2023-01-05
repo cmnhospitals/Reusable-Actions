@@ -130,6 +130,8 @@ jobs:
       run: dotnet publish "$ENV:PROJECT_DIR/$ENV:PROJECT_FILE" --configuration ${{ matrix.configuration }} --output $ENV:${{ matrix.configuration }}_DIR --no-restore
     - name: "📦 Pack"
       run: |
+        New-Item -Path . -Name "octopus" -ItemType "directory" -Force | Out-Null
+        New-Item -Path octopus -Name "${{ matrix.configuration }}" -ItemType "directory" -Force | Out-Null
         Compress-Archive -CompressionLevel Optimal -Path $ENV:${{ matrix.configuration }}_DIR\* -DestinationPath octopus\${{ matrix.configuration }}\$ENV:OCTOPUS_PROJECT_NAME.${{ matrix.configuration }}.${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}.zip
         #octo pack --format="Zip" --id="$ENV:OCTOPUS_PROJECT_NAME.${{ matrix.configuration }}" --version=${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }} --basePath=$ENV:${{ matrix.configuration }}_DIR --outFolder=octopus/${{ matrix.configuration }} --overwrite
     - name: "🐙 Push ${{ matrix.configuration }} Build To Octopus"
