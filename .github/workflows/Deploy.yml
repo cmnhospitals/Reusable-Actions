@@ -112,10 +112,10 @@ jobs:
       uses: actions/setup-dotnet@v2
       with:
         dotnet-version: ${{ inputs.dotnet_version }}
-    - name: "🐙 Install Octopus CLI"
-      uses: OctopusDeploy/install-octopus-cli-action@v3
-      with:
-        version: latest
+    # - name: "🐙 Install Octopus CLI"
+    #   uses: OctopusDeploy/install-octopus-cli-action@v3
+    #   with:
+    #     version: latest
     - name: "🏷 Set InformationalVersion in .csproj file"
       id: set_version
       run: |
@@ -128,15 +128,16 @@ jobs:
       run: dotnet restore "$ENV:PROJECT_DIR/$ENV:PROJECT_FILE"
     - name: "🛠️ Build ${{ matrix.configuration }}"
       run: dotnet publish "$ENV:PROJECT_DIR/$ENV:PROJECT_FILE" --configuration ${{ matrix.configuration }} --output $ENV:${{ matrix.configuration }}_DIR --no-restore
-    - name: "🐙📦 Pack"
+    - name: "📦 Pack"
       run: |
-        octo pack --format="Zip" --id="$ENV:OCTOPUS_PROJECT_NAME.${{ matrix.configuration }}" --version=${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }} --basePath=$ENV:${{ matrix.configuration }}_DIR --outFolder=octopus/${{ matrix.configuration }} --overwrite
+        Compress-Archive -CompressionLevel Optimal -Path $ENV:${{ matrix.configuration }}_DIR\* -DestinationPath octopus\${{ matrix.configuration }}\$ENV:OCTOPUS_PROJECT_NAME.${{ matrix.configuration }}.${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}.zip
+        #octo pack --format="Zip" --id="$ENV:OCTOPUS_PROJECT_NAME.${{ matrix.configuration }}" --version=${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }} --basePath=$ENV:${{ matrix.configuration }}_DIR --outFolder=octopus/${{ matrix.configuration }} --overwrite
     - name: "🐙 Push ${{ matrix.configuration }} Build To Octopus"
       uses: OctopusDeploy/push-package-action@v3
       with:
         space: Web
         overwrite_mode: OverwriteExisting
-        packages: octopus/${{ matrix.configuration }}/${{ env.OCTOPUS_PROJECT_NAME }}.${{ matrix.configuration }}.${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}.zip
+        packages: octopus\${{ matrix.configuration }}\${{ env.OCTOPUS_PROJECT_NAME }}.${{ matrix.configuration }}.${{ needs.Version.outputs.new_version || needs.Version.outputs.previous_version }}.zip
 
   Build_Information:
     name: "📋 Push Build Information File"
