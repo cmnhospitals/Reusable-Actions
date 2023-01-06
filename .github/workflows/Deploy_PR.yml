@@ -72,13 +72,14 @@ jobs:
       id: version
       uses: cmnhospitals/github-tag-action@2.3.3
       env:
-        CUSTOM_VERSION: ${{ steps.get_version.outputs.PROJECT_VERSION }}
-        APPEND_COMMIT_SHA: false
+        CUSTOM_TAG: ${{ env.CI_PR_NUMBER }}-pr
+        #CUSTOM_VERSION: ${{ steps.get_version.outputs.PROJECT_VERSION }}
+        #APPEND_COMMIT_SHA: false
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         PREFIX: ${{ inputs.octopus_project_name }}-
-        PRERELEASE_SUFFIX: pr-${{ env.CI_PR_NUMBER }}
+        #PRERELEASE_SUFFIX: ${{ env.CI_PR_NUMBER }}-pr
         RELEASE_BRANCHES: main
-        TAG_CONTEXT: repo
+        #TAG_CONTEXT: repo
         DRY_RUN: true
   Build:
     env:
