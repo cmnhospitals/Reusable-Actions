@@ -148,10 +148,15 @@ jobs:
     steps:
     - name: "🤩 GitHub Environment Variables Action"
       uses: FranzDiebold/github-env-vars-action@v2
-    # - name: "🐙 Install Octopus CLI"
-    #   uses: OctopusDeploy/install-octopus-cli-action@v3
-    #   with:
-    #     version: latest
+    - name: "🐙 Install Octopus CLI"
+      uses: OctopusDeploy/install-octopus-cli-action@v3
+      with:
+        version: latest
+    - name: "🐙 Delete Release"
+      env:
+        OCTOPUS_SPACE: Web
+      run: |
+        octo delete-releases --project=$ENV:OCTOPUS_PROJECT_NAME --channel="Pull Requests" --minVersion=${{ env.CI_PR_NUMBER }}-pr --maxVersion=${{ env.CI_PR_NUMBER }}-pr --server=$ENV:OCTOPUS_URL --apiKey=$ENV:OCTOPUS_API_KEY
     - name: "🐙 Create Release"
       uses: OctopusDeploy/create-release-action@v3
       with:

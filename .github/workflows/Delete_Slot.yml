@@ -3,19 +3,10 @@ name: "🚀 Deploy"
 on:
     workflow_call:
         inputs:
-            project_name:
-                description: "The name of the project passed from the caller workflow. You should include '.Web', '.Admin', etc., but NOT '.csproj'"
-                required: true
-                type: string
             octopus_project_name:
-                description: 'The Octopus Deploy project name passed from the caller workflow'
+                description: 'The Octopus Deploy project name passed from the caller workflow.'
                 required: true
                 type: string
-            is_pci:
-                description: 'Boolean value for whether or not the caller workflow is a PCI application repository'
-                default: false
-                required: false
-                type: boolean
 
 defaults:
     run:
@@ -33,28 +24,28 @@ jobs:
     steps:
     - name: Print Environment Variables
       run: "gci env:"
-  Version:
-    name: 🏷 Version Step
-    outputs:
-      new_tag: ${{ steps.version.outputs.new_tag }}
-      new_version: ${{ steps.version.outputs.new_version }}
-      previous_tag: ${{ steps.version.outputs.tag }}
-      previous_version: ${{ steps.version.outputs.version }}
-      project_version: ${{ steps.get_version.outputs.PROJECT_VERSION }}
-    runs-on: ubuntu-latest
+  Delete_Slot:
+    name: ☠️ Delete Slot
+    runs-on: self-hosted
     steps:
     - name: 🚚 Get Latest Code
       uses: actions/checkout@v3
       with:
         fetch-depth: "0"
-    - name: 🤩 GitHub Environment Variables Action
-      uses: FranzDiebold/github-env-vars-action@v2
-    - name: 🐙 Run Runbook to Delete Deployment Slot
-      uses: OctopusDeploy/run-runbook-action@v3
+    # - name: 🤩 GitHub Environment Variables Action
+    #   uses: FranzDiebold/github-env-vars-action@v2
+    - name: Install Octopus CLI 🐙
+      uses: OctopusDeploy/install-octopus-cli-action@v3
       with:
-        project: 'Automation Tools'
+        version: latest
+    - name: 🐙 Run Runbook to Delete Deployment Slot
+      uses: OctopusDeploy/run-runbook-action@v2.0.1
+      with:
+        project: '${{ inputs.octopus_project_name }}'
         runbook: 'Remove A Deployment Slot'
         environments: "Azure - Dev,Azure - Test"
         variables: |
-          SlotName=${{ inputs.slot_name }}
+            SlotName:${{ github.event.pull_request.number }}-pr
         space: Web
+        server: ${{ env.OCTOPUS_URL }}
+        api_key: ${{ env.OCTOPUS_API_KEY }}
