@@ -15,11 +15,6 @@ on:
                 description: 'The Octopus Deploy project name passed from the caller workflow'
                 required: true
                 type: string
-            is_pci:
-                description: 'Boolean value for whether or not the caller workflow is a PCI application repository'
-                default: false
-                required: false
-                type: boolean
             node_version:
                 description: 'The required version of node passed from the caller workflow'
                 required: true
