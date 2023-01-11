@@ -32,16 +32,18 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: "0"
-    - name: Install Octopus CLI 🐙
-      uses: OctopusDeploy/install-octopus-cli-action@v3
-      with:
-        version: latest
+    # - name: Install Octopus CLI 🐙
+    #   uses: OctopusDeploy/install-octopus-cli-action@v3
+    #   with:
+    #     version: latest
     - name: 🐙 Run Runbook to Delete Deployment Slot
-      uses: OctopusDeploy/run-runbook-action@v2.0.1
+      uses: OctopusDeploy/run-runbook-action@v3
       with:
         project: '${{ inputs.octopus_project_name }}'
         runbook: 'Remove A Deployment Slot'
-        environments: "Azure - Dev,Azure - Test"
+        environments: |
+            Azure - Dev
+            Azure - Test
         variables: |
             SlotName:${{ github.event.pull_request.number }}-pr
         space: Web
